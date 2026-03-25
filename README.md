@@ -14,8 +14,6 @@
 
 ## Equipo
 * **Nicolás León Parra**
-* [Compañero 1]
-* [Compañero 2]
 
 ## Documentación Completa
 Toda la ingeniería de requisitos, diseño técnico y modelo de negocio se encuentra en nuestra **[Wiki](../../wiki)**.
