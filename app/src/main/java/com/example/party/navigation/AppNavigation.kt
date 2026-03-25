@@ -13,5 +13,10 @@ fun AppNavigation() {
     NavHost(navController = navController, startDestination = "feed") {
         composable("feed") { FeedScreen(vm, navController) }
         composable("wallet") { WalletScreen(vm, navController) }
+        composable("profile") { ProfileScreen(navController) }
+        composable("details/{discoId}") { backStackEntry ->
+            val discoId = backStackEntry.arguments?.getString("discoId")
+            EventDetailsScreen(discoId, vm, navController)
+        }
     }
 }

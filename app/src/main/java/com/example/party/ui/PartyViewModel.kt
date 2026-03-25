@@ -17,4 +17,8 @@ class PartyViewModel : ViewModel() {
         _likedDiscos.value = _likedDiscos.value + discoteca
         _uiState.value = _uiState.value.filter { it.id != discoteca.id }
     }
+
+    fun onDislike(discoteca: Discoteca) {
+        _uiState.value = _uiState.value.filter { it.id != discoteca.id }
+    }
 }
