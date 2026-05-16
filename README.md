@@ -17,3 +17,4 @@
 
 ## Documentación Completa
 Toda la ingeniería de requisitos, diseño técnico y modelo de negocio se encuentra en nuestra **[Wiki](../../wiki)**.
+https://youtu.be/W6BmyHyHPWs
