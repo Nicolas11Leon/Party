@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "704598801413",
+    "firebase_url": "https://party-71fe9-default-rtdb.firebaseio.com",
+    "project_id": "party-71fe9",
+    "storage_bucket": "party-71fe9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:704598801413:android:134d601ff0faedfa17b06c",
+        "android_client_info": {
+          "package_name": "com.example.party"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIy-gxkY0nSkXB3gGQPyYfFUfiUBZ2NIg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
