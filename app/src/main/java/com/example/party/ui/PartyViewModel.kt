@@ -86,6 +86,10 @@ class PartyViewModel : ViewModel() {
     private val _sedeLng = MutableStateFlow(-74.0560)
     private val _sedeDireccion = MutableStateFlow("")
 
+    // --- NUEVO: ESTADO DEL RADAR ---
+    private val _trackingActivo = MutableStateFlow(false)
+    val trackingActivo: StateFlow<Boolean> = _trackingActivo
+
     private var currentUid: String? = null
     private var likesListener: ValueEventListener? = null
     private var dislikesListener: ValueEventListener? = null
@@ -118,6 +122,36 @@ class PartyViewModel : ViewModel() {
         }
     }
 
+    // ==========================================
+    // MOTOR DE TIEMPO REAL: AMIGOS EN EL MAPA
+    // ==========================================
+    fun activarTracking() {
+        val uid = currentUid ?: return
+        _trackingActivo.value = true
+        val ref = usersRef.child(uid)
+        ref.child("isOnline").onDisconnect().setValue(false)
+        ref.child("isOnline").setValue(true)
+    }
+
+    fun actualizarMiUbicacion(lat: Double, lng: Double) {
+        val uid = currentUid ?: return
+        if (!_trackingActivo.value) return
+        usersRef.child(uid).updateChildren(mapOf(
+            "latitud" to lat,
+            "longitud" to lng
+        ))
+    }
+
+    fun desactivarTracking() {
+        val uid = currentUid ?: return
+        _trackingActivo.value = false
+        val ref = usersRef.child(uid)
+        ref.child("isOnline").onDisconnect().cancel()
+        ref.child("isOnline").setValue(false)
+    }
+
+    // ==========================================
+
     private fun limpiarListenersUsuario() {
         currentUid?.let { uid ->
             val userNode = usersRef.child(uid)
@@ -136,6 +170,7 @@ class PartyViewModel : ViewModel() {
         _uiState.value = emptyList(); myDislikesIds = emptyList()
         _ingresosHoy.value = 0.0; _ticketsVendidos.value = 0; _aforoDisponible.value = 0
         _profileLoaded.value = false
+        _trackingActivo.value = false
     }
 
     private fun calcularStatsDiscoteca() {
@@ -345,6 +380,11 @@ class PartyViewModel : ViewModel() {
                     val ig = userSnap.child("instagram").getValue(String::class.java) ?: ""
                     val tk = userSnap.child("tiktok").getValue(String::class.java) ?: ""
 
+                    // Novedad: Extraemos los datos de GPS
+                    val isOnline = userSnap.child("isOnline").getValue(Boolean::class.java) ?: false
+                    val lat = userSnap.child("latitud").getValue(Double::class.java) ?: 0.0
+                    val lng = userSnap.child("longitud").getValue(Double::class.java) ?: 0.0
+
                     val mapSeguidores = mutableMapOf<String, Boolean>()
                     userSnap.child("seguidores").children.forEach { it.key?.let { k -> mapSeguidores[k] = true } }
 
@@ -354,14 +394,15 @@ class PartyViewModel : ViewModel() {
                     val userObj = Usuario(
                         uid = uid, username = username, email = email, rol = rol,
                         isPrivate = isPriv, photoUrl = photo, instagram = ig, tiktok = tk,
-                        seguidores = mapSeguidores, siguiendo = mapSiguiendo
+                        seguidores = mapSeguidores, siguiendo = mapSiguiendo,
+                        isOnline = isOnline, latitud = lat, longitud = lng
                     )
 
                     if (rol == "Discoteca") {
-                        val lat = userSnap.child("latitudSede").getValue(Double::class.java) ?: 4.6670
-                        val lng = userSnap.child("longitudSede").getValue(Double::class.java) ?: -74.0560
+                        val latS = userSnap.child("latitudSede").getValue(Double::class.java) ?: 4.6670
+                        val lngS = userSnap.child("longitudSede").getValue(Double::class.java) ?: -74.0560
                         val dir = userSnap.child("direccionSede").getValue(String::class.java) ?: ""
-                        if (lat != 0.0) listaClubes.add(userObj.copy(latitudSede = lat, longitudSede = lng, direccionSede = dir))
+                        if (latS != 0.0) listaClubes.add(userObj.copy(latitudSede = latS, longitudSede = lngS, direccionSede = dir))
                     } else if (rol == "Usuario" && uid != currentUid) {
                         listaUsuarios.add(userObj)
                     }

@@ -1,5 +1,7 @@
 package com.example.party.model
 
+import com.google.firebase.database.PropertyName
+
 data class Usuario(
     val uid: String = "",
     val username: String = "",
@@ -9,15 +11,20 @@ data class Usuario(
     val photoUrl: String = "",
     val reputacion: Double = 5.0,
 
-    // --- NUEVO: REDES SOCIALES ---
     val instagram: String = "",
     val tiktok: String = "",
 
-    // --- CAMPOS DE SEDE FÍSICA PARA CLUBES ---
     val direccionSede: String = "",
     val latitudSede: Double = 0.0,
     val longitudSede: Double = 0.0,
 
     val seguidores: Map<String, Boolean> = emptyMap(),
-    val siguiendo: Map<String, Boolean> = emptyMap()
+    val siguiendo: Map<String, Boolean> = emptyMap(),
+
+    // --- NUEVO: RADAR SOCIAL EN TIEMPO REAL ---
+    @get:PropertyName("isOnline")
+    @set:PropertyName("isOnline")
+    var isOnline: Boolean = false,
+    var latitud: Double = 0.0,
+    var longitud: Double = 0.0
 )

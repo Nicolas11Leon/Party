@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -34,12 +35,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
+import coil.compose.SubcomposeAsyncImage
 import com.example.party.navigation.Details
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -66,6 +72,12 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
     val clubes by viewModel.clubes.collectAsState()
     val likedDiscos by viewModel.likedDiscos.collectAsState()
     val ticketsAgrupados by viewModel.ticketsAgrupados.collectAsState()
+
+    // --- NUEVO: ESTADOS SOCIALES ---
+    val allUsers by viewModel.allUsers.collectAsState()
+    val misSeguidos by viewModel.misSeguidos.collectAsState()
+    val miUid by viewModel.currentUserId.collectAsState()
+    val trackingActivo by viewModel.trackingActivo.collectAsState()
 
     val mapStyle = MapStyleOptions(MIDNIGHT_MAP_STYLE)
 
@@ -95,6 +107,21 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
     var filterMaxPrice by remember { mutableFloatStateOf(200000f) }
     val generosDisponibles = listOf("Todos", "Reggaeton", "Electrónica", "Crossover", "Salsa", "Techno")
 
+    // --- EL CEREBRO DE DESCONEXIÓN INSTANTÁNEA ---
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP || event == Lifecycle.Event.ON_DESTROY) {
+                viewModel.desactivarTracking()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.desactivarTracking()
+        }
+    }
+
     val filteredClubes by remember(clubes, eventos, filterGenre, filterMaxPrice) {
         derivedStateOf {
             if (filterGenre == "Todos" && filterMaxPrice >= 200000f) {
@@ -116,7 +143,13 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
         object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 locationResult.lastLocation?.let { loc ->
-                    if (loc.hasAccuracy() && loc.accuracy < 25f) userLocation = LatLng(loc.latitude, loc.longitude)
+                    if (loc.hasAccuracy() && loc.accuracy < 25f) {
+                        userLocation = LatLng(loc.latitude, loc.longitude)
+                        // Enviamos nuestra ubicación a Firebase SOLO si tenemos el radar encendido
+                        if (trackingActivo) {
+                            viewModel.actualizarMiUbicacion(loc.latitude, loc.longitude)
+                        }
+                    }
                 }
             }
         }
@@ -213,8 +246,6 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
         ) {
             val userMarkerState = rememberMarkerState(position = userLocation)
             userMarkerState.position = userLocation
-
-            // FIX DE RENDIMIENTO 1: Cachear el ícono del usuario
             val userIcon = remember { drawSleekNavArrow() }
 
             Marker(
@@ -226,11 +257,10 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
                 zIndex = 0f
             )
 
+            // --- PINTAR DISCOTECAS ---
             val likedIds = likedDiscos.map { it.id }
-
             filteredClubes.forEach { club ->
                 val clubPos = LatLng(club.latitudSede, club.longitudSede)
-
                 val eventosDelClub = eventos.filter { it.creadorId == club.uid }
                 val eventoActivo = eventosDelClub.firstOrNull()
 
@@ -243,18 +273,13 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
 
                 val markerState = rememberMarkerState(key = club.uid, position = clubPos)
                 markerState.position = clubPos
-
-                // FIX DE RENDIMIENTO 2: Memoria Caché para el Bitmap del Club.
-                // Evita que el click se reinicie 60 veces por segundo.
                 val profileImg = markerImages[club.uid]
-                val cachedClubIcon = remember(pinStatus, club.username, profileImg) {
-                    drawPremiumClubMarker(pinStatus, club.username, profileImg)
-                }
+                val cachedClubIcon = remember(pinStatus, club.username, profileImg) { drawPremiumClubMarker(pinStatus, club.username, profileImg) }
 
                 Marker(
                     state = markerState,
                     title = if (club.username.isNotEmpty()) club.username else "Club VIP",
-                    icon = cachedClubIcon, // Usar el ícono guardado en memoria
+                    icon = cachedClubIcon,
                     anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                     zIndex = 10f,
                     onClick = {
@@ -265,11 +290,44 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
                         destinationEventoId = eventoActivo?.id
                         isNavigating = true
                         routeTrigger++
-
                         coroutineScope.launch { cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(clubPos, 16.5f)) }
                         true
                     }
                 )
+            }
+
+            // --- REQUISITO DE TIEMPO REAL: PINTAR AMIGOS VIP ---
+            val amigosOnline = allUsers.filter { user ->
+                misSeguidos.contains(user.uid) && user.siguiendo.containsKey(miUid) && user.isOnline
+            }
+
+            amigosOnline.forEach { amigo ->
+                val amigoPos = LatLng(amigo.latitud, amigo.longitud)
+                val markerState = rememberMarkerState(key = amigo.uid, position = amigoPos)
+                markerState.position = amigoPos
+
+                MarkerComposable(
+                    state = markerState,
+                    onClick = { true }, // No hace nada especial al clickear el amigo
+                    zIndex = 20f
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(55.dp)
+                            .clip(CircleShape)
+                            .border(3.dp, Color(0xFFE91E63), CircleShape) // Borde Fucsia VIP
+                            .background(Color.DarkGray),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SubcomposeAsyncImage(
+                            model = amigo.photoUrl,
+                            contentDescription = "Amigo VIP",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            error = { Text(if(amigo.username.isNotEmpty()) amigo.username.take(1).uppercase() else "?", color = Color.White, fontWeight = FontWeight.Bold) }
+                        )
+                    }
+                }
             }
 
             if (isNavigating && routePoints.isNotEmpty()) {
@@ -277,6 +335,7 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
             }
         }
 
+        // --- BOTÓN SUPERIOR: FILTROS DE DISCOTECA ---
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -289,7 +348,32 @@ fun MapScreen(viewModel: PartyViewModel, navController: NavController) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Tune, contentDescription = "Filtros", tint = Color.White, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("RADAR: ${filteredClubes.size} CLUBES", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("EXPLORAR: ${filteredClubes.size} CLUBES", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        }
+
+        // --- BOTÓN SUPERIOR DERECHO: RADAR DE AMIGOS (TIEMPO REAL) ---
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 48.dp, end = 16.dp)
+                .clip(RoundedCornerShape(30.dp))
+                .background(Color.Black.copy(alpha = 0.7f))
+                .padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "RADAR VIP",
+                    color = if (trackingActivo) Color.Green else Color.Gray,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = trackingActivo,
+                    onCheckedChange = { if (it) viewModel.activarTracking() else viewModel.desactivarTracking() },
+                    modifier = Modifier.height(24.dp)
+                )
             }
         }
 
