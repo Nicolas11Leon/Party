@@ -1,4 +1,4 @@
-# Party App - Computación Móvil 2026-1
+# Party App 
 
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)
 ![Compose](https://img.shields.io/badge/Jetpack_Compose-Material3-green.svg)
