@@ -10,7 +10,7 @@ data class Discoteca(
     val longitud: Double = -74.0582,
     val fotoUrl: String = "",
     val hora: String = "10:00 PM",
-    val fechaMs: Long = System.currentTimeMillis(), // <-- NUEVO: Para expiración
+    val fechaMs: Long = System.currentTimeMillis(),
     val direccion: String = "Zona de Rumba",
     val aforoMaximo: Int = 100,
     val confirmados: Int = 0

@@ -19,72 +19,104 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-// Importes de Firebase (Descomenta esto si usas Realtime Database o Firestore)
-// import com.google.firebase.database.FirebaseDatabase
-// import com.google.firebase.database.DataSnapshot
-// import com.google.firebase.database.DatabaseError
-// import com.google.firebase.database.ValueEventListener
+
+// Importes de Firebase REALES
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // El reloj real ejecuta la versión inteligente con internet
             SmartWearApp()
         }
     }
 }
 
 // ==========================================
-// 1. EL CEREBRO (Conexión a Firebase)
+// 1. EL CEREBRO (Conexión Real a Firebase con Auth Anónima)
 // ==========================================
 @Composable
 fun SmartWearApp() {
-    // Aquí pegas el UID de tu usuario de prueba de Firebase
-    val miUsuarioUID = "AQUI_PEGA_TU_UID_DE_FIREBASE"
+    // Asegúrate de tener el UID correcto aquí:
+    val miUsuarioUID = "PEGA_AQUI_EL_UID_DE_TU_USUARIO_DE_PRUEBA"
 
-    var ticketActual by remember { mutableStateOf("Buscando boleta...") }
+    var ticketActual by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var mensajeError by remember { mutableStateOf("Conectando a la base de datos...") }
 
-    // Simulación de llamada a Firebase (El código real está comentado abajo)
+    // Conexión Directa a Firebase (Sin pasar por Auth)
     LaunchedEffect(Unit) {
-        /* // CÓDIGO REAL PARA MOSTRAR AL PROFESOR:
-        val database = FirebaseDatabase.getInstance().getReference("usuarios/$miUsuarioUID/ticket_activo")
-        database.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val ticketId = snapshot.getValue(String::class.java)
-                if (ticketId != null) {
-                    ticketActual = ticketId
-                } else {
-                    ticketActual = "Sin boletas"
-                }
-                isLoading = false
-            }
-            override fun onCancelled(error: DatabaseError) {
-                ticketActual = "Error de red"
-                isLoading = false
-            }
-        })
-        */
+        try {
+            val database = FirebaseDatabase.getInstance().getReference("users/$miUsuarioUID/tickets")
 
-        // Simulación para que no crashee si no tienes Firebase configurado en el reloj
-        kotlinx.coroutines.delay(1500)
-        ticketActual = "ID-REAL-DE-MI-FIREBASE"
-        isLoading = false
+            database.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    var ticketEncontrado: String? = null
+
+                    // Recorremos los tickets del usuario
+                    for (ticketSnapshot in snapshot.children) {
+                        val status = ticketSnapshot.child("status").getValue(String::class.java)
+
+                        if (status == "activo") {
+                            ticketEncontrado = ticketSnapshot.key
+                            break
+                        }
+                    }
+
+                    ticketActual = ticketEncontrado
+                    if (ticketEncontrado == null) {
+                        mensajeError = "No hay tickets activos"
+                    }
+                    isLoading = false
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    // Si Firebase rechaza la lectura, aquí te dirá exactamente por qué
+                    mensajeError = "Error Firebase: ${error.message}"
+                    isLoading = false
+                }
+            })
+        } catch (e: Exception) {
+            mensajeError = "Error de inicio: ${e.localizedMessage}"
+            isLoading = false
+        }
     }
 
+    // Dibujo de pantallas
     if (isLoading) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            BasicText("Sincronizando...", style = TextStyle(color = Color.White))
-        }
+        PantallaMensaje(mensajeError)
+    } else if (ticketActual != null) {
+        TicketScreenUI(ticketId = ticketActual!!)
     } else {
-        // Le pasamos el dato real a la interfaz
-        TicketScreenUI(ticketId = ticketActual)
+        PantallaMensaje(mensajeError)
     }
 }
 
 // ==========================================
-// 2. LA CARA (Solo dibuja lo que le pasen)
+// 2. PANTALLA DE CARGA / ERRORES
+// ==========================================
+@Composable
+fun PantallaMensaje(mensaje: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(8.dp), // Un poco de padding para que el texto no se corte en los bordes
+        contentAlignment = Alignment.Center
+    ) {
+        BasicText(
+            text = mensaje,
+            style = TextStyle(color = Color.White, textAlign = TextAlign.Center, fontSize = 12.sp)
+        )
+    }
+}
+
+// ==========================================
+// 3. LA CARA (Dibuja el QR real)
 // ==========================================
 @Composable
 fun TicketScreenUI(ticketId: String) {
@@ -102,7 +134,7 @@ fun TicketScreenUI(ticketId: String) {
             BasicText(
                 text = "PARTY VIP",
                 style = TextStyle(
-                    color = Color(0xFFE91E63),
+                    color = Color(0xFF9D00FF), // Morado Neón oficial del proyecto
                     fontWeight = FontWeight.Black,
                     fontSize = 16.sp,
                     textAlign = TextAlign.Center
@@ -119,13 +151,13 @@ fun TicketScreenUI(ticketId: String) {
                 contentAlignment = Alignment.Center
             ) {
                 if (LocalInspectionMode.current) {
-                    // Si estamos en la vista previa sin internet
+                    // Vista previa en Android Studio
                     BasicText(
                         text = "QR: $ticketId",
                         style = TextStyle(color = Color.Black, fontSize = 10.sp, textAlign = TextAlign.Center)
                     )
                 } else {
-                    // En la app real, descarga el QR con el ID verdadero
+                    // App real: Se conecta a la API y genera el dibujo del QR usando el Hash de Firebase
                     AsyncImage(
                         model = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=$ticketId",
                         contentDescription = "QR de acceso",
@@ -141,11 +173,10 @@ fun TicketScreenUI(ticketId: String) {
 }
 
 // ==========================================
-// 3. LA HERRAMIENTA DEL ESTUDIANTE (Preview)
+// 4. PREVIEW PARA ANDROID STUDIO
 // ==========================================
 @Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 220, heightDp = 220)
 @Composable
 fun PreviewParaElProfe() {
-    // Le inyectamos datos falsos solo para la foto
-    TicketScreenUI(ticketId = "TICKET-FALSO-DE-PRUEBA")
+    TicketScreenUI(ticketId = "12345-ABCDE-MOCK")
 }

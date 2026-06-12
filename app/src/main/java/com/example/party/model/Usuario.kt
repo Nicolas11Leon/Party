@@ -21,7 +21,6 @@ data class Usuario(
     val seguidores: Map<String, Boolean> = emptyMap(),
     val siguiendo: Map<String, Boolean> = emptyMap(),
 
-    // --- NUEVO: RADAR SOCIAL EN TIEMPO REAL ---
     @get:PropertyName("isOnline")
     @set:PropertyName("isOnline")
     var isOnline: Boolean = false,

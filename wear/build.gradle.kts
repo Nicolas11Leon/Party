@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -9,7 +10,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.party.wear"
+        applicationId = "com.example.party"
         minSdk = 30
         targetSdk = 36
         versionCode = 1
@@ -55,9 +56,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.play.services.wearable)
 
+    // FIREBASE
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
     implementation("com.google.firebase:firebase-database")
     implementation("com.google.firebase:firebase-auth")
 
+    // IMÁGENES (QR)
     implementation("io.coil-kt:coil-compose:2.6.0")
 }

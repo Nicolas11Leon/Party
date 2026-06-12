@@ -62,7 +62,7 @@ fun ProfileScreen(viewModel: PartyViewModel, navController: NavController) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
     var showStaffDialog by remember { mutableStateOf(false) }
-    var showSocialsDialog by remember { mutableStateOf(false) } // NUEVO: Modal de Redes
+    var showSocialsDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
